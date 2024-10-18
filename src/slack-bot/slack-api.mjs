@@ -25,7 +25,7 @@ export class SlackService {
     }
 
     async updateMessage(channelId, ts, text) {
-        const response = await web.chat.update({
+        const response = await this.web.chat.update({
             channel: channelId,
             ts: ts,
             text: text,
