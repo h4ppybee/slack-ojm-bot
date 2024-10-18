@@ -10,7 +10,6 @@ export async function action(event) {
         [OJMDefine.LAMBDA_FUNC.COMMAND_LIST]: commandList,
     };
 
-    // 모달 처리
     if (event.payload) {
         const payload = JSON.parse(event.payload)
         console.log('Parsed payload:', payload);

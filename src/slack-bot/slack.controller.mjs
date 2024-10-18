@@ -20,7 +20,9 @@ export async function askLunchMenu(e) {
     for (let loop = 0, size = result.data.length; loop < size; loop++) {
         const channels = result.data[loop];
         const [channelId, ...managers] = channels;
-        await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 오점머? :모코코_햄버거:`)
+        if (channelId != '') {
+            await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 오점머? :모코코_햄버거:`)
+        }
     }
 }
 
@@ -39,7 +41,9 @@ export async function remindOrder(e) {
     for (let loop = 0, size = result.data.length; loop < size; loop++) {
         const channels = result.data[loop];
         const [channelId, ...managers] = channels;
-        await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 배달 주문 시간이에용 :모코코_인사:\n:heavy_check_mark:수저 포크\n:heavy_check_mark:법카`)
+        if (channelId != '') {
+            await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 배달 주문 시간이에용 :모코코_인사:\n:heavy_check_mark:수저 포크\n:heavy_check_mark:법카`)
+        }
     }
 }
 
@@ -82,7 +86,7 @@ export async function handleRegisterModal(e) {
 export async function asyncRegister(e) {
     const slackService = new SlackService();
     if (await GoogleSheetService.requestUpsert([e.channel_id, ...e.users])) {
-        return await slackService.updateMessage(e.channel_id, e.message_ts, "오점머 알림 예약 완료! :모코코_인사:");
+        return await slackService.updateMessage(e.channel_id, e.message_ts, "오점머 알림 예약 완료! :모코코_인사:\n-----------------------------------\n" + Utils.getUserListText(e.users));
     } else {
         return await slackService.updateMessage(e.channel_id, e.message_ts, ":x: 오점머 알림 예약 실패..");
     }
@@ -90,63 +94,58 @@ export async function asyncRegister(e) {
 
 export async function commandDelete(e) {
     console.log("commandDelete()");
-    await GoogleSheetService.requestDelete(e.channel_id);
+    const slackService = new SlackService();
+    const res = await slackService.sendMessage(e.channel_id, "알림 삭제 중.. :모코코_도망:");
+
+    const sqsService = new SQSService();
+    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.DELETE,
+        {
+            channel_id: e.channel_id,
+            message_ts: res.ts
+        }));
     return {
         statusCode: 200,
-        body: JSON.stringify({
-            text: "오점머 알림이 취소되었어요 :모코코_눈물:",
-            response_type: "in_channel"
-        })
+        body: ""
     };
 }
 
 export async function asyncDelete(e) {
-
+    const slackService = new SlackService();
+    await GoogleSheetService.requestDelete(e.channel_id);
+    return await slackService.updateMessage(e.channel_id, e.message_ts, "오점머 알림이 삭제되었어요 :모코코_눈물:");
 }
 
 export async function commandList(e) {
     console.log("commandList()");
+    const slackService = new SlackService();
+    const res = await slackService.sendMessage(e.channel_id, "데이터 불러오는 중.. :모코코_도망:");
 
+    const sqsService = new SQSService();
+    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.GET_LIST,
+        {
+            channel_id: e.channel_id,
+            message_ts: res.ts
+        }));
     return {
         statusCode: 200,
-        body: JSON.stringify({
-            text: "데이터 불러오는 중.."
-        })
+        body: ""
     };
 }
 
 export async function asyncGetList(e) {
+    const slackService = new SlackService();
     const result = await GoogleSheetService.requestGetByChannelID(e.channel_id);
     if (result === undefined) {
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                text: ":x: 이 채널에 등록된 알림이 없습니다 :x:",
-                response_type: "in_channel"
-            })
-        };
+        return await slackService.updateMessage(e.channel_id, e.message_ts, ":x: 이 채널에 등록된 알림이 없습니다 :x:");
     }
 
     const [channelId, ...managers] = result;
     const weekdayIdx = Utils.getWeekdayIndex();
     let prefix = '';
-    if (weekdayIdx < 0) {
+    if (weekdayIdx >= 0) {
         prefix = `:rice_ball: 오늘의 담당: <@${managers[weekdayIdx]}> :rice_ball:\n-----------------------------------\n`
     }
-    let message = prefix +
-        `> 월 <@${managers[0]}>` + '\n' +
-        `> 화 <@${managers[1]}>` + '\n' +
-        `> 수 <@${managers[2]}>` + '\n' +
-        `> 목 <@${managers[3]}>` + '\n' +
-        `> 금 <@${managers[4]}>`;
+    let message = prefix + Utils.getUserListText(managers);
     console.log(message);
-    fetch(e.response_url, {
-        method: 'POST',
-        body: JSON.stringify({
-            text: message,
-            response_type: "in_channel"
-        }),
-        headers: { 'Content-Type': 'application/json' }
-    });
-    return message;
+    return await slackService.updateMessage(channelId, e.message_ts, message);
 }
