@@ -12,7 +12,7 @@ export const handler = async (event) => {
             return await action(event);
         } else if (event.Records) {
             for (const record of event.Records) {
-                await queueAction(record);
+                return await queueAction(record);
             }
         }
         else {

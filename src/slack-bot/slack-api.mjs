@@ -2,7 +2,7 @@ import { WebClient } from "@slack/web-api";
 
 export class SlackService {
 
-    init() {
+    constructor() {
         this.token = process.env.SLACK_BOT_OAUTH_TOKEN;
         this.web = new WebClient(this.token);
     }
@@ -14,10 +14,7 @@ export class SlackService {
                 text: text,
             });
             console.log(`Message sent at ${result.ts}`);
-            return {
-                statusCode: 200,
-                body: JSON.stringify(result.ts),
-            };
+            return result;
         } catch (error) {
             console.error(`Error sending message: ${error}`);
             return {
@@ -25,6 +22,30 @@ export class SlackService {
                 body: JSON.stringify(error),
             };
         }
+    }
+
+    async updateMessage(channelId, ts, text) {
+        const response = await web.chat.update({
+            channel: channelId,
+            ts: ts,
+            text: text,
+        });
+
+        if (response.ok) {
+            console.log('메시지가 수정되었습니다:', response);
+            return response;
+        } else {
+            console.error('메시지 수정 중 오류 발생:', response.error);
+            return response.error;
+        }
+    }
+
+    async sendResult(responseUrl, result) {
+        await fetch(responseUrl, {
+            method: 'POST',
+            body: result,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
     // 모달 창을 띄우는 함수
@@ -59,7 +80,7 @@ export class SlackService {
             console.log(result);
             return {
                 statusCode: 200,
-                body: JSON.stringify({ text: '담당자 지정 폼을 작성해주세요' }),
+                body: "",
             };
         } catch (error) {
             console.error(':x:모달창 오픈 에러 발생!:x:\n', error);

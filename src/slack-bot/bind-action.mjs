@@ -1,4 +1,5 @@
-import { askLunchMenu, remindOrder, commandRegister, commandDelete, handleRegisterModal, commandList } from './slack.controller.mjs';
+import { SlackService } from './slack-api.mjs';
+import { askLunchMenu, remindOrder, commandRegister, commandDelete, handleRegisterModal, commandList, asyncRegister, asyncGetList, asyncDelete } from './slack.controller.mjs';
 import { OJMDefine } from './slack.define.mjs';
 export async function action(event) {
     const actions = {
@@ -32,10 +33,10 @@ export async function queueAction(record) {
         [OJMDefine.SQS_TYPE.DELETE]: asyncDelete,
     }
 
-    const message = JSON.parse(record.body);
-    if (actions[message.type]) {
-        return await actions[message.type];
+    const body = JSON.parse(record.body);
+    if (actions[body.type]) {
+        return await actions[body.type](body.message);
     } else {
-        console.error(`No action : ${message.type}`)
+        console.error(`No action : ${body.type}`)
     }
 }

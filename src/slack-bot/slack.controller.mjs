@@ -1,6 +1,8 @@
 import { GoogleSheetService } from "../google-sheet/google-sheet-api.mjs";
+import { SqsMessage, SQSService } from "../sqs/sqs.service.mjs";
 import { Utils } from "../utils.mjs";
 import { SlackService } from "./slack-api.mjs";
+import { OJMDefine } from "./slack.define.mjs";
 
 //#region 스케쥴러
 export async function askLunchMenu(e) {
@@ -15,7 +17,6 @@ export async function askLunchMenu(e) {
 
     const result = await GoogleSheetService.requestGet();
     const slackService = new SlackService();
-    slackService.init();
     for (let loop = 0, size = result.data.length; loop < size; loop++) {
         const channels = result.data[loop];
         const [channelId, ...managers] = channels;
@@ -35,7 +36,6 @@ export async function remindOrder(e) {
 
     const result = await GoogleSheetService.requestGet();
     const slackService = new SlackService();
-    slackService.init();
     for (let loop = 0, size = result.data.length; loop < size; loop++) {
         const channels = result.data[loop];
         const [channelId, ...managers] = channels;
@@ -48,7 +48,6 @@ export async function commandRegister(e) {
     console.log("commandRegister()");
     const { trigger_id, channel_id } = e;
     const slackService = new SlackService();
-    slackService.init();
     return await slackService.openModal(trigger_id, channel_id);
 }
 
@@ -59,24 +58,34 @@ export async function handleRegisterModal(e) {
     const wednesdayUser = e.view.state.values['block_2']['user_select_2'].selected_user;
     const thursdayUser = e.view.state.values['block_3']['user_select_3'].selected_user;
     const fridayUser = e.view.state.values['block_4']['user_select_4'].selected_user;
-
     const channelId = JSON.parse(e.view.private_metadata).channel_id;
 
-    // 3초이내에 200보내야해서 await생략
-    GoogleSheetService.requestUpsert([channelId, mondayUser, tuesdayUser, wednesdayUser, thursdayUser, fridayUser]);
 
+    const slackService = new SlackService();
+    const res = await slackService.sendMessage(channelId, "알림 설정 중.. :모코코_도망:");
+
+    const sqsService = new SQSService();
+    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.REGISTER,
+        {
+            channel_id: channelId,
+            users: [mondayUser, tuesdayUser, wednesdayUser, thursdayUser, fridayUser],
+            message_ts: res.ts
+        }));
     return {
         statusCode: 200,
         body: JSON.stringify({
-            response_action: 'clear',
-            text: "오점머 알림 예약 완료! :모코코_인사:",
-            response_type: "in_channel"
+            response_action: 'clear'
         }),
     };
 }
 
 export async function asyncRegister(e) {
-
+    const slackService = new SlackService();
+    if (await GoogleSheetService.requestUpsert([e.channel_id, ...e.users])) {
+        return await slackService.updateMessage(e.channel_id, e.message_ts, "오점머 알림 예약 완료! :모코코_인사:");
+    } else {
+        return await slackService.updateMessage(e.channel_id, e.message_ts, ":x: 오점머 알림 예약 실패..");
+    }
 }
 
 export async function commandDelete(e) {
