@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node index.mjs",
     "start:dev": "npm start --debug --builder swc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint . --ext .js,.mjs",
+    "format": "prettier --write ."
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
@@ -17,6 +18,11 @@
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
+    "holidays-kr": "^1.1.5",
     "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.27.0",
+    "prettier": "^3.5.3"
   }
 }

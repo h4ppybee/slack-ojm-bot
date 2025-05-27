@@ -19,7 +19,7 @@ export class SQSService {
     }
 }
 
-export class SqsMessage {
+export class SQSMessage {
     constructor(type, message) {
         this.type = type;
         this.message = message;

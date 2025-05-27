@@ -1,16 +1,19 @@
 import dotenv from 'dotenv';
-import { OJMDefine } from './src/slack-bot/slack.define.mjs';
-import { action, queueAction } from './src/slack-bot/bind-action.mjs';
+import { action, queueAction } from './src/slack/bind-action.mjs';
 import querystring from 'querystring';
-// 환경 변수를 로드합니다.
+import { OJMDefine } from './src/slack/slack.define.mjs';
+
 dotenv.config();
 export const handler = async (event) => {
     console.log('Received event:', JSON.stringify(event, null, 2));
 
     try {
         if (event.type) {
-            return await action(event);
+            const res = await action(event, event.isTest);
+            console.log('Response:', res);
+            return res;
         } else if (event.Records) {
+            // sqs 큐 메시지 처리
             for (const record of event.Records) {
                 return await queueAction(record);
             }
@@ -77,6 +80,6 @@ export const handler = async (event) => {
 //     "body": "dG9rZW49Z2I3Mkt3UElCRWxiaU9YTzlDWkdNWmppJnRlYW1faWQ9VEg5OVdLUjVZJnRlYW1fZG9tYWluPWRvdWJsZXVnYW1lcyZjaGFubmVsX2lkPUMwN01TOUVQVjZVJmNoYW5uZWxfbmFtZT1ib3QtdGVzdCZ1c2VyX2lkPVUwMVVHRU5LS0YwJnVzZXJfbmFtZT1zdXllb24mY29tbWFuZD0lMkYlRUMlOTglQTQlRUMlQTAlOTAlRUIlQTglQjhfJUVCJThCJUI0JUVCJThCJUI5JUVDJTlFJTkwJnRleHQ9JmFwaV9hcHBfaWQ9QTA3TjlNVTNBTEImaXNfZW50ZXJwcmlzZV9pbnN0YWxsPWZhbHNlJnJlc3BvbnNlX3VybD1odHRwcyUzQSUyRiUyRmhvb2tzLnNsYWNrLmNvbSUyRmNvbW1hbmRzJTJGVEg5OVdLUjVZJTJGNzg4NzYwNTA1NTIwNiUyRlRxdlNTbUhHbU1rc1k1aTlBbUlDbVc0VyZ0cmlnZ2VyX2lkPTc4OTQyMzAyODcxNTQuNTg3MzM2NjcxMjAyLjhmNjBjM2VhZTM3NzUyOWUyMDE0NzI0N2ZlM2FmMWIx",
 //     "isBase64Encoded": true
 // })
-// await handler({ body: JSON.stringify({ type: OJMDefine.LAMBDA_FUNC.ASK_LUNCH_MENU }) });
-// await handler({body: JSON.stringify({ type: OJMDefine.LAMBDA_FUNC.REMIND_ORDER })});
-// await handler({ body: JSON.stringify({ command: "/오점머_담당자" }) });
+// await handler({ isTest: true, type: OJMDefine.LAMBDA_FUNC.ASK_LUNCH_MENU, channel_id: 'C07S9MNSSJ2' });
+// await handler({ type: OJMDefine.LAMBDA_FUNC.ASK_LUNCH_MENU });
+// await handler({ isTest: true, type: OJMDefine.LAMBDA_FUNC.REMIND_ORDER, channel_id: 'C07S9MNSSJ2' });

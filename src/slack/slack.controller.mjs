@@ -1,50 +1,94 @@
 import { GoogleSheetService } from "../google-sheet/google-sheet-api.mjs";
-import { SqsMessage, SQSService } from "../sqs/sqs.service.mjs";
+import { SQSMessage, SQSService } from "../sqs/sqs.service.mjs";
 import { Utils } from "../utils.mjs";
-import { SlackService } from "./slack-api.mjs";
+import { SlackService } from "./slack.api.mjs";
 import { OJMDefine } from "./slack.define.mjs";
 
 //#region 스케쥴러
-export async function askLunchMenu(e) {
+export async function askLunchMenu(e, isTest) {
     console.log("askLunchMenu()");
-    const weekdayIdx = Utils.getWeekdayIndex();
-    if (weekdayIdx < 0) {
+
+    const isWorkingDay = await Utils.isWorkingDayAsync();
+    if (!isWorkingDay) {
         return {
-            statusCode: 400,
-            body: JSON.stringify({ message: ':x:주말입니다.' }),
+            statusCode: 200,
+            body: JSON.stringify({ message: '공휴일입니다.' }),
         };
     }
 
-    const result = await GoogleSheetService.requestGet();
-    const slackService = new SlackService();
-    for (let loop = 0, size = result.data.length; loop < size; loop++) {
-        const channels = result.data[loop];
-        const [channelId, ...managers] = channels;
-        if (channelId != '') {
-            await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 오점머? :모코코_햄버거:`)
+    const weekdayIdx = Utils.getWeekIdx();
+    const slackService = new SlackService()
+    if (isTest) {
+        if (e.channel_id) {
+            // 특정 채널에만 메시지 전송
+            const result = await GoogleSheetService.requestGetByChannelID(e.channel_id);
+            if (!result) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ message: '등록된 담당자가 없습니다.' }),
+                };
+            }
+            const [channelId, ...managers] = result;
+            if (channelId && managers[weekdayIdx]) {
+                await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 오점머? :모코코_햄버거:`);
+            }
+            return { statusCode: 200, body: 'test' };
         }
+    } else {
+        // 전체 채널에 메시지 전송(기존 동작)
+        const result = await GoogleSheetService.requestGet();
+        for (let loop = 0, size = result.data.length; loop < size; loop++) {
+            const channels = result.data[loop];
+            const [channelId, ...managers] = channels;
+            if (channelId != '' && managers[weekdayIdx]) {
+                await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 오점머? :모코코_햄버거:`)
+            }
+        }
+        return { statusCode: 200, body: 'product' };
     }
+    return { statusCode: 400, body: 'fail' };
 }
 
-export async function remindOrder(e) {
+export async function remindOrder(e, isTest) {
     console.log("remindOrder()");
-    const weekdayIdx = Utils.getWeekdayIndex();
-    if (weekdayIdx < 0) {
+    const isWorkingDay = await Utils.isWorkingDayAsync();
+    if (!isWorkingDay) {
         return {
-            statusCode: 400,
-            body: JSON.stringify({ message: ':x:주말입니다.' }),
+            statusCode: 200,
+            body: JSON.stringify({ message: '공휴일입니다.' }),
         };
     }
 
-    const result = await GoogleSheetService.requestGet();
+    const weekdayIdx = Utils.getWeekIdx();
     const slackService = new SlackService();
-    for (let loop = 0, size = result.data.length; loop < size; loop++) {
-        const channels = result.data[loop];
-        const [channelId, ...managers] = channels;
-        if (channelId != '') {
-            await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 배달 주문 시간이에용 :모코코_인사:\n:heavy_check_mark:수저 포크\n:heavy_check_mark:법카`)
+    if (isTest) {
+        if (e.channel_id) {
+            // 특정 채널에만 메시지 전송
+            const result = await GoogleSheetService.requestGetByChannelID(e.channel_id);
+            if (!result) {
+                return {
+                    statusCode: 200,
+                    body: JSON.stringify({ message: '등록된 담당자가 없습니다.' }),
+                };
+            }
+            const [channelId, ...managers] = result;
+            if (channelId != '') {
+                await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 배달 주문 시간이에용 :모코코_인사:\n:heavy_check_mark:수저 포크\n:heavy_check_mark:법카`)
+            }
+            return { statusCode: 200, body: 'test' };
         }
+    } else {
+        const result = await GoogleSheetService.requestGet();
+        for (let loop = 0, size = result.data.length; loop < size; loop++) {
+            const channels = result.data[loop];
+            const [channelId, ...managers] = channels;
+            if (channelId != '') {
+                await slackService.sendMessage(channelId, `<@${managers[weekdayIdx]}> 배달 주문 시간이에용 :모코코_인사:\n:heavy_check_mark:수저 포크\n:heavy_check_mark:법카`)
+            }
+        }
+        return { statusCode: 200, body: 'product' };
     }
+    return { statusCode: 400, body: 'fail' };
 }
 
 //#region 커맨드
@@ -52,7 +96,7 @@ export async function commandRegister(e) {
     console.log("commandRegister()");
     const { trigger_id, channel_id } = e;
     const slackService = new SlackService();
-    return await slackService.openModal(trigger_id, channel_id);
+    return await slackService.openRegisterModal(trigger_id, channel_id);
 }
 
 export async function handleRegisterModal(e) {
@@ -64,12 +108,11 @@ export async function handleRegisterModal(e) {
     const fridayUser = e.view.state.values['block_4']['user_select_4'].selected_user;
     const channelId = JSON.parse(e.view.private_metadata).channel_id;
 
-
     const slackService = new SlackService();
     const res = await slackService.sendMessage(channelId, "알림 설정 중.. :모코코_도망:");
 
     const sqsService = new SQSService();
-    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.REGISTER,
+    await sqsService.sendMessage(new SQSMessage(OJMDefine.SQS_TYPE.REGISTER,
         {
             channel_id: channelId,
             users: [mondayUser, tuesdayUser, wednesdayUser, thursdayUser, fridayUser],
@@ -98,7 +141,7 @@ export async function commandDelete(e) {
     const res = await slackService.sendMessage(e.channel_id, "알림 삭제 중.. :모코코_도망:");
 
     const sqsService = new SQSService();
-    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.DELETE,
+    await sqsService.sendMessage(new SQSMessage(OJMDefine.SQS_TYPE.DELETE,
         {
             channel_id: e.channel_id,
             message_ts: res.ts
@@ -121,7 +164,7 @@ export async function commandList(e) {
     const res = await slackService.sendMessage(e.channel_id, "데이터 불러오는 중.. :모코코_도망:");
 
     const sqsService = new SQSService();
-    await sqsService.sendMessage(new SqsMessage(OJMDefine.SQS_TYPE.GET_LIST,
+    await sqsService.sendMessage(new SQSMessage(OJMDefine.SQS_TYPE.GET_LIST,
         {
             channel_id: e.channel_id,
             message_ts: res.ts
@@ -140,10 +183,10 @@ export async function asyncGetList(e) {
     }
 
     const [channelId, ...managers] = result;
-    const weekdayIdx = Utils.getWeekdayIndex();
+    const weekdayIdx = Utils.getWeekIdx();
     let prefix = '';
     if (weekdayIdx >= 0) {
-        prefix = `:rice_ball: 오늘의 담당: <@${managers[weekdayIdx]}> :rice_ball:\n-----------------------------------\n`
+        prefix = `:rice_ball: 오늘의 담당: <@${managers[weekdayIdx]}> :rice_ball:\n-----------------------------------\n`;
     }
     let message = prefix + Utils.getUserListText(managers);
     console.log(message);

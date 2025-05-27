@@ -10,7 +10,7 @@ export class OJMDefine {
     static SQS_TYPE = {
         REGISTER: "REGISTER",
         DELETE: "DELETE",
-        GET_LIST: "GETLIST"
+        GET_LIST: "GET_LIST"
     }
 
     static MODAL = {

@@ -49,7 +49,7 @@ export class SlackService {
     }
 
     // 모달 창을 띄우는 함수
-    async openModal(trigger_id, channel_id) {
+    async openRegisterModal(trigger_id, channel_id) {
         try {
             const result = await this.web.views.open({
                 trigger_id: trigger_id,
@@ -83,7 +83,7 @@ export class SlackService {
                 body: "",
             };
         } catch (error) {
-            console.error(':x:모달창 오픈 에러 발생!:x:\n', error);
+            console.error(':x:에러:x:\n', error);
             return {
                 statusCode: 500,
                 body: JSON.stringify(error),
